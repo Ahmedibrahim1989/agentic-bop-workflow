@@ -20,7 +20,7 @@ It is designed to be:
 flowchart LR
     A[Source PDFs/DOCX per rig] --> B[Ingestion: extract_text.py]
     B --> C[Combined text file: production-data-bop-real.txt]
-    C --> D[ADNOCWorkflow.run_complete_workflow()]
+    C --> D[ADNOCWorkflow.run_complete_workflow]
     D --> E1[Agent 1: Comparison Analyst]
     E1 --> E2[Agent 2: Gap Detector]
     E2 --> E3[Agent 3: HP Evaluator]
@@ -33,13 +33,13 @@ flowchart LR
 
 1. **Raw documents**
 
-   * Location: `data/source_documents/<RigName>/`
+   * Location: `data/source_documents/<27.1/`
    * Formats: PDF / DOCX for ROPs and JSAs.
 
 2. **Rig discovery**
 
-   * `scripts/list_available_rigs.py` scans `data/source_documents/`
-   * Outputs the list of rig folders (e.g. Dana, AlJubail, AlReem, Marawwah).
+   * `scripts/list_available_rigs.py` scans `data/source_documents/27.1`
+   * Outputs the list of rig folders (e.g. Dana, AlJubail, AlReem, Marawwah,...).
 
 3. **Text extraction & compilation**
 
@@ -232,7 +232,7 @@ outputs/BOP Installation/<timestamp>/
 Use `make` for reproducible commands:
 
 * `make install` – create venv and install dependencies
-* `make list-rigs` – list rigs in `data/source_documents`
+* `make list-rigs` – list rigs in `data/source_documents/27.1`
 * `make extract-auto` – auto text extraction
 * `make workflow-openai` – run full workflow with OpenAI
 * `make workflow-claude` – run full workflow with Claude
@@ -268,7 +268,7 @@ codex run python scripts/openai_api_deployment.py \
   --documents-file production-data-bop-real.txt
 ```
 
-Because `run_complete_workflow()` takes explicit inputs (operation name, documents) and writes into timestamped output folders, every Codex CLI run is repeatable and auditable.
+Because `run_complete_workflow` takes explicit inputs (operation name, documents) and writes into timestamped output folders, every Codex CLI run is repeatable and auditable.
 
 ---
 
