@@ -18,15 +18,15 @@ It is designed to be:
 
 ```mermaid
 flowchart LR
-  A[Source PDFs/DOCX per rig<br>data/source_documents/] --> B[Ingestion<br>extract_text.py]
-  B --> C[Combined text file<br>production-data-bop-real.txt]
-  C --> D[ADNOCWorkflow.run_complete_workflow()]
-  D --> E1[Agent 1<br>Comparison Analyst]
-  E1 --> E2[Agent 2<br>Gap Detector]
-  E2 --> E3[Agent 3<br>HP Evaluator]
-  E3 --> E4[Agent 4<br>Equipment Validator]
-  E4 --> E5[Agent 5<br>Standardisation Writer]
-  E5 --> F[outputs/<operation>/<timestamp>/...]
+    A[Source PDFs/DOCX per rig] --> B[Ingestion: extract_text.py]
+    B --> C[Combined text file: production-data-bop-real.txt]
+    C --> D[ADNOCWorkflow.run_complete_workflow()]
+    D --> E1[Agent 1: Comparison Analyst]
+    E1 --> E2[Agent 2: Gap Detector]
+    E2 --> E3[Agent 3: HP Evaluator]
+    E3 --> E4[Agent 4: Equipment Validator]
+    E4 --> E5[Agent 5: Standardisation Writer]
+    E5 --> F[Outputs directory with timestamped results]
 ```
 
 ### 1.2 Data-flow pipeline
