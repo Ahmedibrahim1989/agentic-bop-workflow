@@ -80,13 +80,49 @@ flowchart LR
 
 ---
 
-## 2. Agent roles
+## 2. Integrated Compliance Template
+
+The project includes a comprehensive **Integrated Compliance Template** (`prompts/INTEGRATED-COMPLIANCE-TEMPLATE.md`) that serves as the master reference document for all agent operations. This template:
+
+- **Unifies all five agents** under a single compliance framework
+- **Aligns with ADNOC standards** including HSE-PSW-CP01 to CP22, GHSE-MAN-05
+- **Provides field & audit readiness** with structured workflow and accountability
+- **Defines success criteria** and quality checkpoints for each agent
+
+### 2.1 Template Structure
+
+| Section | Purpose | Implementing Agent |
+|---------|---------|-------------------|
+| Section 1 | Rig Procedure Technical Writer | Agent 1 (initiates), Agent 5 (produces final) |
+| Section 2 | Gap Detector (Compliance & Coverage) | Agent 2 |
+| Section 3 | Human Performance Evaluator | Agent 3 |
+| Section 4 | Equipment Validator | Agent 4 |
+| Section 5 | Standardisation Writer | Agent 5 |
+| Section 6 | Integrated Workflow & Accountability | All agents |
+| Section 7 | References & Document Control | All agents |
+
+### 2.2 ADNOC Corporate Practices Reference
+
+The template maps all procedures against relevant ADNOC Corporate Practices:
+
+- **HSE-PSW-CP01**: HSE Management System
+- **HSE-PSW-CP02**: Risk Management
+- **HSE-PSW-CP03**: Permit to Work
+- **HSE-PSW-CP04-08**: Lifting, Pressure Testing, LOTO, Working at Height, Confined Space
+- **HSE-PSW-CP09**: Process Safety Management
+- **HSE-PSW-CP10**: Emergency Response
+- **GHSE-MAN-05**: Global HSE Manual
+
+---
+
+## 3. Agent roles
 
 Each agent has:
 
 * A **prompt template** in `prompts/`
 * A **Python class** in `src/agents/`
 * A **logical responsibility** in the workflow
+* A **reference to the Integrated Compliance Template**
 
 | Agent | File (prompt)                       | Class (code)                                                     | Purpose                                                                                                                    |
 | ----- | ----------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
@@ -109,9 +145,9 @@ and returns:
 
 ---
 
-## 3. Environment & installation
+## 4. Environment & installation
 
-### 3.1 Python environment
+### 4.1 Python environment
 
 ```bash
 # From project root
@@ -122,7 +158,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 3.2 Environment variables
+### 4.2 Environment variables
 
 Copy `.env.example` to `.env` and fill in keys:
 
@@ -140,7 +176,7 @@ MODEL_NAME_ANTHROPIC="claude-3-5-sonnet"
 TEMPERATURE="0.2"
 ```
 
-### 3.3 Test API connectivity
+### 4.3 Test API connectivity
 
 ```bash
 python scripts/test_api_connection.py
@@ -154,7 +190,7 @@ This will:
 
 ---
 
-## 4. Running the workflow
+## 5. Running the workflow
 
 Assume your PDFs/DOCX are under:
 
@@ -164,7 +200,7 @@ data/source_documents/AlJubail/...
 ...
 ```
 
-### 4.1 List available rigs
+### 5.1 List available rigs
 
 ```bash
 python scripts/list_available_rigs.py
@@ -176,7 +212,7 @@ Optional: specify custom source directory:
 python scripts/list_available_rigs.py --source-dir data/source_documents
 ```
 
-### 4.2 Build combined text file
+### 5.2 Build combined text file
 
 **Manual-guided (recommended for highest accuracy):**
 
@@ -201,7 +237,7 @@ python scripts/convert_pdfs_to_text.py \
 
 You must manually verify the resulting file, as PDF extraction can mis-handle tables and formatting.
 
-### 4.3 Run full multi-agent workflow (OpenAI)
+### 5.3 Run full multi-agent workflow (OpenAI)
 
 ```bash
 python scripts/openai_api_deployment.py \
@@ -209,7 +245,7 @@ python scripts/openai_api_deployment.py \
   --documents-file production-data-bop-real.txt
 ```
 
-### 4.4 Run full multi-agent workflow (Claude)
+### 5.4 Run full multi-agent workflow (Claude)
 
 ```bash
 python scripts/claude_api_deployment.py \
@@ -225,9 +261,9 @@ outputs/BOP Installation/<timestamp>/
 
 ---
 
-## 5. Makefile & Codex CLI usage
+## 6. Makefile & Codex CLI usage
 
-### 5.1 Makefile targets
+### 6.1 Makefile targets
 
 Use `make` for reproducible commands:
 
@@ -243,7 +279,7 @@ Example:
 make workflow-openai OPERATION="BOP Installation"
 ```
 
-### 5.2 Codex CLI integration
+### 6.2 Codex CLI integration
 
 If you're using Codex CLI to execute the pipeline end-to-end, you can wrap commands in a script or directly:
 
@@ -272,9 +308,9 @@ Because `run_complete_workflow()` takes explicit inputs (operation name, documen
 
 ---
 
-## 6. Extending the system
+## 7. Extending the system
 
-### 6.1 Adding more rigs
+### 7.1 Adding more rigs
 
 1. Drop additional PDFs/DOCX into `data/source_documents/<RigName>/`.
 2. Run `list_available_rigs.py` to confirm detection.
@@ -282,21 +318,21 @@ Because `run_complete_workflow()` takes explicit inputs (operation name, documen
 
 No changes to code are required.
 
-### 6.2 Adding a new agent (e.g. Environmental Analyst)
+### 7.2 Adding a new agent (e.g. Environmental Analyst)
 
 1. Add a prompt: `prompts/AGENT-6-ENVIRONMENTAL-ANALYST.md`
 2. Add a class: `src/agents/environmental_analyst_agent.py`
 3. Register it in `src/workflow/orchestrator.py` in the `AGENT_ORDER` sequence and wiring.
 4. The orchestrator will automatically pass previous outputs to the new agent.
 
-### 6.3 Switching models
+### 7.3 Switching models
 
 Change `MODEL_NAME_OPENAI`, `MODEL_NAME_ANTHROPIC`, or temperature in `.env`.
 The orchestrator uses a simple `LLMAgent` abstraction, so backends are swappable without rewriting agent logic.
 
 ---
 
-## 7. Traceability practices
+## 8. Traceability practices
 
 * **Version control**: commit scripts, prompts, configs and outputs (or at least metadata) per run.
 * **Output directories**: never overwrite; each run uses a timestamped folder.
@@ -305,7 +341,7 @@ The orchestrator uses a simple `LLMAgent` abstraction, so backends are swappable
 
 ---
 
-## 8. Project structure
+## 9. Project structure
 
 ```text
 agentic-bop-workflow/
@@ -340,6 +376,7 @@ agentic-bop-workflow/
 │  ├─ run_bop_auto.py
 │  └─ test_api_connection.py
 ├─ prompts/
+│  ├─ INTEGRATED-COMPLIANCE-TEMPLATE.md   ← Master compliance framework
 │  ├─ AGENT-1-PROMPT-TEMPLATE.md
 │  ├─ AGENT-2-GAP-DETECTOR.md
 │  ├─ AGENT-3-HP-EVALUATOR.md
