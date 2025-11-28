@@ -95,6 +95,7 @@ Each agent has:
 | 3     | `AGENT-3-HP-EVALUATOR.md`           | `HPEvaluatorAgent` (`hp_evaluator_agent.py`)                     | Evaluate human-performance maturity, critical step verification, checklists, barriers.                                     |
 | 4     | `AGENT-4-EQUIPMENT-VALIDATOR.md`    | `EquipmentValidatorAgent` (`equipment_validator_agent.py`)       | Extract and compare equipment specs, assess feasibility of standardisation per rig.                                        |
 | 5     | `AGENT-5-STANDARDISATION-WRITER.md` | `StandardisationWriterAgent` (`standardisation_writer_agent.py`) | Synthesise all findings into standardised ROP + JSA and implementation package.                                            |
+| Integrated | `ADNOC-INTEGRATED-COMPLIANCE-TEMPLATE.md` | `IntegratedComplianceAgent` (`integrated_compliance_agent.py`) | All-in-one agent combining all 5 specialist capabilities for field-ready, audit-compliant ROP packages. |
 
 Each agent receives:
 
@@ -223,6 +224,57 @@ Outputs will appear under:
 outputs/BOP Installation/<timestamp>/
 ```
 
+### 4.5 Run integrated single-agent workflow
+
+The **Integrated Compliance Agent** combines all 5 specialist agent capabilities into a single, comprehensive workflow that produces field-ready, audit-compliant ROP packages in one pass.
+
+**Benefits of Integrated Mode:**
+- Faster execution (single LLM call vs. 5 sequential calls)
+- Complete ROP package with all compliance artifacts
+- Consistent formatting and terminology throughout
+- Reduced token usage for simpler documents
+
+**Python API usage:**
+
+```python
+from src.workflow.orchestrator import ADNOCWorkflow, WorkflowConfig
+
+# Configure for integrated mode
+config = WorkflowConfig(
+    mode="integrated",              # Use integrated single-agent mode
+    backend="anthropic",            # or "openai"
+    rig_name="Dana",                # Rig name for context
+    operation_type="BOP Installation",
+    adnoc_cps=["HSE-PSW-CP01", "HSE-PSW-CP04", "HSE-PSW-CP09"],
+    constraints="Limited crane capacity",
+)
+
+# Initialize and run
+workflow = ADNOCWorkflow(config)
+docs = {"Existing ROP": "...", "JSA": "...", "Equipment List": "..."}
+output_dir = workflow.run("BOP Installation", docs)
+
+print(f"Integrated ROP package saved to: {output_dir}")
+```
+
+**Output structure for integrated mode:**
+
+```text
+outputs/BOP Installation/integrated-<timestamp>/
+├── integrated_rop_package.md      # Complete ROP with all sections
+├── integrated_rop_package.meta.json  # Execution metadata
+└── summary.json                   # Run summary
+```
+
+**Integrated ROP Package Contents:**
+
+1. **Part 1: Rig Operating Procedure** - Full ROP per ADNOC template (13 sections)
+2. **Part 2: Gap Analysis Report** - Compliance mapping and remediation actions
+3. **Part 3: Human Performance Assessment** - Error-prone steps and HP controls
+4. **Part 4: Equipment Validation Matrix** - Equipment compliance status
+5. **Part 5: Document Control & Appendices** - Revision history, distribution list
+6. **Part 6: Compliance Certification** - Signature blocks for approval
+
 ---
 
 ## 5. Makefile & Codex CLI usage
@@ -328,7 +380,8 @@ agentic-bop-workflow/
 │  │  ├─ gap_detector_agent.py
 │  │  ├─ hp_evaluator_agent.py
 │  │  ├─ equipment_validator_agent.py
-│  │  └─ standardisation_writer_agent.py
+│  │  ├─ standardisation_writer_agent.py
+│  │  └─ integrated_compliance_agent.py
 │  └─ workflow/
 │     ├─ __init__.py
 │     └─ orchestrator.py
@@ -344,7 +397,8 @@ agentic-bop-workflow/
 │  ├─ AGENT-2-GAP-DETECTOR.md
 │  ├─ AGENT-3-HP-EVALUATOR.md
 │  ├─ AGENT-4-EQUIPMENT-VALIDATOR.md
-│  └─ AGENT-5-STANDARDISATION-WRITER.md
+│  ├─ AGENT-5-STANDARDISATION-WRITER.md
+│  └─ ADNOC-INTEGRATED-COMPLIANCE-TEMPLATE.md
 └─ data/
    ├─ source_documents/
    │  └─ (rig folders: Dana/, AlJubail/, … with PDFs/DOCX)

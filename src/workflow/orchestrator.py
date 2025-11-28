@@ -4,28 +4,39 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from src.agents.comparison_agent import ComparisonAgent
 from src.agents.gap_detector_agent import GapDetectorAgent
 from src.agents.hp_evaluator_agent import HPEvaluatorAgent
 from src.agents.equipment_validator_agent import EquipmentValidatorAgent
 from src.agents.standardisation_writer_agent import StandardisationWriterAgent
+from src.agents.integrated_compliance_agent import IntegratedComplianceAgent
 from src.agents.base import AgentResult
 
 
 @dataclass
 class WorkflowConfig:
     """Configuration for workflow execution.
-    
+
     Attributes:
         backend: LLM backend to use ("openai" or "anthropic").
         output_base_dir: Base directory for outputs (default: "outputs").
+        mode: Workflow mode - "sequential" (5 agents) or "integrated" (single agent).
+        rig_name: Name of the target rig (for integrated mode).
+        operation_type: Type of operation (for integrated mode).
+        adnoc_cps: List of applicable Corporate Practices (for integrated mode).
+        constraints: Any rig-specific constraints (for integrated mode).
     """
     backend: str = "openai"
     output_base_dir: str = "outputs"
+    mode: str = "sequential"  # "sequential" or "integrated"
+    rig_name: Optional[str] = None
+    operation_type: Optional[str] = None
+    adnoc_cps: List[str] = field(default_factory=list)
+    constraints: Optional[str] = None
 
 
 class ADNOCWorkflow:
@@ -50,18 +61,21 @@ class ADNOCWorkflow:
 
     def __init__(self, config: WorkflowConfig):
         """Initialize the workflow orchestrator.
-        
+
         Args:
             config: Workflow configuration.
         """
         self.config = config
-        
-        # Initialize all agents
+
+        # Initialize sequential agents
         self.agent1 = ComparisonAgent()
         self.agent2 = GapDetectorAgent()
         self.agent3 = HPEvaluatorAgent()
         self.agent4 = EquipmentValidatorAgent()
         self.agent5 = StandardisationWriterAgent()
+
+        # Initialize integrated agent
+        self.integrated_agent = IntegratedComplianceAgent()
 
     def run_complete_workflow(
         self,
@@ -187,3 +201,125 @@ class ADNOCWorkflow:
         print(f"{'='*80}\n")
 
         return out_dir
+
+    def run_integrated_workflow(
+        self,
+        operation_name: str,
+        documents: Dict[str, str],
+    ) -> Path:
+        """Run the integrated single-agent workflow.
+
+        This method uses the Integrated Compliance Agent to produce a complete
+        ROP package in a single pass, combining all five specialist agent
+        capabilities.
+
+        Args:
+            operation_name: Name of the operation (e.g., "BOP Installation").
+            documents: Dictionary mapping document names to their text content.
+
+        Returns:
+            Path to the output directory containing all results.
+
+        Example:
+            >>> config = WorkflowConfig(backend="anthropic", mode="integrated")
+            >>> workflow = ADNOCWorkflow(config)
+            >>> docs = {"Existing ROP": "...", "JSA": "..."}
+            >>> output_dir = workflow.run_integrated_workflow("BOP Installation", docs)
+        """
+        # Create timestamped output directory
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        out_dir = Path(self.config.output_base_dir) / operation_name / f"integrated-{timestamp}"
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        print(f"\n{'='*80}")
+        print(f"Starting ADNOC Integrated Compliance Workflow")
+        print(f"Operation: {operation_name}")
+        print(f"Backend: {self.config.backend}")
+        print(f"Mode: Integrated (Single-Agent)")
+        if self.config.rig_name:
+            print(f"Rig: {self.config.rig_name}")
+        print(f"Output: {out_dir}")
+        print(f"{'='*80}\n")
+
+        # Build context from config
+        context = {
+            "rig_name": self.config.rig_name or "Not specified",
+            "operation_type": self.config.operation_type or operation_name,
+            "adnoc_cps": self.config.adnoc_cps,
+            "constraints": self.config.constraints or "None specified",
+        }
+
+        # Run integrated agent
+        print("Running Integrated Compliance Agent...")
+        result = self.integrated_agent.run(
+            documents=documents,
+            context=context,
+            backend=self.config.backend,
+        )
+
+        # Save outputs
+        # Main ROP package
+        rop_path = out_dir / "integrated_rop_package.md"
+        rop_path.write_text(result.content, encoding="utf-8")
+
+        # Metadata
+        meta_path = out_dir / "integrated_rop_package.meta.json"
+        meta_path.write_text(
+            json.dumps(result.meta, indent=2),
+            encoding="utf-8",
+        )
+
+        # Summary
+        summary = {
+            "operation": operation_name,
+            "timestamp": timestamp,
+            "backend": self.config.backend,
+            "mode": "integrated",
+            "rig_name": self.config.rig_name,
+            "operation_type": self.config.operation_type,
+            "agent": result.meta,
+            "total_tokens": result.meta.get("tokens_total", 0),
+            "total_duration_seconds": result.meta.get("total_duration_seconds", 0),
+        }
+
+        summary_path = out_dir / "summary.json"
+        summary_path.write_text(
+            json.dumps(summary, indent=2),
+            encoding="utf-8",
+        )
+
+        print(f"✓ Integrated Compliance Agent completed")
+        print(f"  Duration: {result.meta.get('total_duration_seconds', 0):.2f}s")
+        print(f"  Tokens: {result.meta.get('tokens_total', 0)}")
+        print()
+
+        print(f"{'='*80}")
+        print(f"Integrated workflow completed successfully!")
+        print(f"Total tokens used: {summary['total_tokens']:,}")
+        print(f"Total duration: {summary['total_duration_seconds']:.2f}s")
+        print(f"Results saved to: {out_dir}")
+        print(f"{'='*80}\n")
+
+        return out_dir
+
+    def run(
+        self,
+        operation_name: str,
+        documents: Dict[str, str],
+    ) -> Path:
+        """Run the workflow based on configured mode.
+
+        This is a convenience method that dispatches to either the sequential
+        or integrated workflow based on the config.mode setting.
+
+        Args:
+            operation_name: Name of the operation.
+            documents: Dictionary mapping document names to their text content.
+
+        Returns:
+            Path to the output directory containing all results.
+        """
+        if self.config.mode == "integrated":
+            return self.run_integrated_workflow(operation_name, documents)
+        else:
+            return self.run_complete_workflow(operation_name, documents)

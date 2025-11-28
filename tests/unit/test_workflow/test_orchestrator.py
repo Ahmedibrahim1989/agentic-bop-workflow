@@ -42,6 +42,34 @@ class TestWorkflowConfig:
         assert config.backend == "anthropic"
         assert config.output_base_dir == "/my/outputs"
 
+    def test_workflow_config_mode_default(self):
+        """WorkflowConfig should default to sequential mode."""
+        config = WorkflowConfig()
+
+        assert config.mode == "sequential"
+
+    def test_workflow_config_integrated_mode(self):
+        """WorkflowConfig should accept integrated mode."""
+        config = WorkflowConfig(mode="integrated")
+
+        assert config.mode == "integrated"
+
+    def test_workflow_config_integrated_mode_with_context(self):
+        """WorkflowConfig should accept all integrated mode context fields."""
+        config = WorkflowConfig(
+            mode="integrated",
+            rig_name="Dana",
+            operation_type="BOP Installation",
+            adnoc_cps=["HSE-PSW-CP01", "HSE-PSW-CP04"],
+            constraints="Limited crane capacity"
+        )
+
+        assert config.mode == "integrated"
+        assert config.rig_name == "Dana"
+        assert config.operation_type == "BOP Installation"
+        assert len(config.adnoc_cps) == 2
+        assert config.constraints == "Limited crane capacity"
+
 
 class TestADNOCWorkflowInitialization:
     """Tests for ADNOCWorkflow initialization."""
@@ -54,20 +82,22 @@ class TestADNOCWorkflowInitialization:
              patch("src.workflow.orchestrator.GapDetectorAgent"), \
              patch("src.workflow.orchestrator.HPEvaluatorAgent"), \
              patch("src.workflow.orchestrator.EquipmentValidatorAgent"), \
-             patch("src.workflow.orchestrator.StandardisationWriterAgent"):
+             patch("src.workflow.orchestrator.StandardisationWriterAgent"), \
+             patch("src.workflow.orchestrator.IntegratedComplianceAgent"):
             workflow = ADNOCWorkflow(config)
 
         assert workflow.config == config
 
     def test_workflow_creates_all_agents(self):
-        """ADNOCWorkflow should create all 5 agents."""
+        """ADNOCWorkflow should create all 5 sequential agents plus integrated agent."""
         config = WorkflowConfig()
 
         with patch("src.workflow.orchestrator.ComparisonAgent") as mock_agent1, \
              patch("src.workflow.orchestrator.GapDetectorAgent") as mock_agent2, \
              patch("src.workflow.orchestrator.HPEvaluatorAgent") as mock_agent3, \
              patch("src.workflow.orchestrator.EquipmentValidatorAgent") as mock_agent4, \
-             patch("src.workflow.orchestrator.StandardisationWriterAgent") as mock_agent5:
+             patch("src.workflow.orchestrator.StandardisationWriterAgent") as mock_agent5, \
+             patch("src.workflow.orchestrator.IntegratedComplianceAgent") as mock_integrated:
             workflow = ADNOCWorkflow(config)
 
         mock_agent1.assert_called_once()
@@ -75,6 +105,22 @@ class TestADNOCWorkflowInitialization:
         mock_agent3.assert_called_once()
         mock_agent4.assert_called_once()
         mock_agent5.assert_called_once()
+        mock_integrated.assert_called_once()
+
+    def test_workflow_creates_integrated_agent(self):
+        """ADNOCWorkflow should create the integrated compliance agent."""
+        config = WorkflowConfig()
+
+        with patch("src.workflow.orchestrator.ComparisonAgent"), \
+             patch("src.workflow.orchestrator.GapDetectorAgent"), \
+             patch("src.workflow.orchestrator.HPEvaluatorAgent"), \
+             patch("src.workflow.orchestrator.EquipmentValidatorAgent"), \
+             patch("src.workflow.orchestrator.StandardisationWriterAgent"), \
+             patch("src.workflow.orchestrator.IntegratedComplianceAgent") as mock_integrated:
+            workflow = ADNOCWorkflow(config)
+
+        assert workflow.integrated_agent is not None
+        mock_integrated.assert_called_once()
 
 
 class TestADNOCWorkflowRunCompleteWorkflow:
@@ -390,3 +436,311 @@ code_example()
         assert "# Analysis Results" in content
         assert "## Section 1" in content
         assert "```python" in content
+
+
+class TestADNOCWorkflowIntegratedMode:
+    """Tests for ADNOCWorkflow integrated mode functionality."""
+
+    @pytest.fixture
+    def mock_integrated_result(self):
+        """Create a mock integrated agent result."""
+        return AgentResult(
+            content="""# Integrated ROP Package
+
+## Part 1: Rig Operating Procedure
+### 1. General Information
+Document number: ROP-001
+
+## Part 2: Gap Analysis Report
+No critical gaps identified.
+
+## Part 3: Human Performance Assessment
+All steps reviewed for HP risks.
+
+## Part 4: Equipment Validation Matrix
+| Equipment | Status |
+|-----------|--------|
+| Crane | Compliant |
+
+## Part 5: Document Control
+Revision: 1.0
+""",
+            meta={
+                "agent": "Integrated Compliance Agent",
+                "backend": "openai",
+                "total_duration_seconds": 5.0,
+                "model": "gpt-4o",
+                "tokens_prompt": 500,
+                "tokens_completion": 300,
+                "tokens_total": 800,
+            }
+        )
+
+    @pytest.fixture
+    def mock_integrated_workflow(self, mock_integrated_result):
+        """Create a workflow with mocked integrated agent."""
+        config = WorkflowConfig(mode="integrated")
+
+        with patch("src.workflow.orchestrator.ComparisonAgent"), \
+             patch("src.workflow.orchestrator.GapDetectorAgent"), \
+             patch("src.workflow.orchestrator.HPEvaluatorAgent"), \
+             patch("src.workflow.orchestrator.EquipmentValidatorAgent"), \
+             patch("src.workflow.orchestrator.StandardisationWriterAgent"), \
+             patch("src.workflow.orchestrator.IntegratedComplianceAgent") as mock_integrated:
+
+            mock_integrated.return_value.run.return_value = mock_integrated_result
+            workflow = ADNOCWorkflow(config)
+            workflow.integrated_agent = mock_integrated.return_value
+
+        return workflow
+
+    def test_run_integrated_workflow_creates_output_directory(
+        self, mock_integrated_workflow, temp_dir, sample_documents
+    ):
+        """run_integrated_workflow should create timestamped output directory."""
+        mock_integrated_workflow.config.output_base_dir = str(temp_dir)
+
+        with patch("builtins.print"):
+            output_dir = mock_integrated_workflow.run_integrated_workflow(
+                "BOP Installation", sample_documents
+            )
+
+        assert output_dir.exists()
+        assert output_dir.is_dir()
+        assert "integrated" in str(output_dir)
+        assert "BOP Installation" in str(output_dir)
+
+    def test_run_integrated_workflow_calls_integrated_agent(
+        self, mock_integrated_workflow, temp_dir, sample_documents
+    ):
+        """run_integrated_workflow should call the integrated agent."""
+        mock_integrated_workflow.config.output_base_dir = str(temp_dir)
+
+        with patch("builtins.print"):
+            mock_integrated_workflow.run_integrated_workflow(
+                "BOP Installation", sample_documents
+            )
+
+        mock_integrated_workflow.integrated_agent.run.assert_called_once()
+
+    def test_run_integrated_workflow_passes_context(
+        self, temp_dir, sample_documents, mock_integrated_result
+    ):
+        """run_integrated_workflow should pass context to the agent."""
+        config = WorkflowConfig(
+            mode="integrated",
+            output_base_dir=str(temp_dir),
+            rig_name="Dana",
+            operation_type="BOP Installation",
+            adnoc_cps=["HSE-PSW-CP01"],
+            constraints="Limited crane capacity"
+        )
+
+        with patch("src.workflow.orchestrator.ComparisonAgent"), \
+             patch("src.workflow.orchestrator.GapDetectorAgent"), \
+             patch("src.workflow.orchestrator.HPEvaluatorAgent"), \
+             patch("src.workflow.orchestrator.EquipmentValidatorAgent"), \
+             patch("src.workflow.orchestrator.StandardisationWriterAgent"), \
+             patch("src.workflow.orchestrator.IntegratedComplianceAgent") as mock_integrated:
+
+            mock_integrated.return_value.run.return_value = mock_integrated_result
+            workflow = ADNOCWorkflow(config)
+
+            with patch("builtins.print"):
+                workflow.run_integrated_workflow("BOP Installation", sample_documents)
+
+            call_args = mock_integrated.return_value.run.call_args
+            context = call_args[1]["context"]
+
+            assert context["rig_name"] == "Dana"
+            assert context["operation_type"] == "BOP Installation"
+            assert "HSE-PSW-CP01" in context["adnoc_cps"]
+            assert context["constraints"] == "Limited crane capacity"
+
+    def test_run_integrated_workflow_creates_rop_package_file(
+        self, mock_integrated_workflow, temp_dir, sample_documents
+    ):
+        """run_integrated_workflow should create the ROP package markdown file."""
+        mock_integrated_workflow.config.output_base_dir = str(temp_dir)
+
+        with patch("builtins.print"):
+            output_dir = mock_integrated_workflow.run_integrated_workflow(
+                "BOP Installation", sample_documents
+            )
+
+        rop_file = output_dir / "integrated_rop_package.md"
+        assert rop_file.exists()
+        content = rop_file.read_text()
+        assert "Integrated ROP Package" in content
+
+    def test_run_integrated_workflow_creates_metadata_file(
+        self, mock_integrated_workflow, temp_dir, sample_documents
+    ):
+        """run_integrated_workflow should create JSON metadata file."""
+        mock_integrated_workflow.config.output_base_dir = str(temp_dir)
+
+        with patch("builtins.print"):
+            output_dir = mock_integrated_workflow.run_integrated_workflow(
+                "BOP Installation", sample_documents
+            )
+
+        meta_file = output_dir / "integrated_rop_package.meta.json"
+        assert meta_file.exists()
+
+        content = meta_file.read_text()
+        data = json.loads(content)
+        assert "agent" in data
+        assert data["agent"] == "Integrated Compliance Agent"
+
+    def test_run_integrated_workflow_creates_summary(
+        self, mock_integrated_workflow, temp_dir, sample_documents
+    ):
+        """run_integrated_workflow should create summary.json file."""
+        mock_integrated_workflow.config.output_base_dir = str(temp_dir)
+
+        with patch("builtins.print"):
+            output_dir = mock_integrated_workflow.run_integrated_workflow(
+                "BOP Installation", sample_documents
+            )
+
+        summary_file = output_dir / "summary.json"
+        assert summary_file.exists()
+
+        content = summary_file.read_text()
+        summary = json.loads(content)
+
+        assert summary["operation"] == "BOP Installation"
+        assert summary["mode"] == "integrated"
+        assert "total_tokens" in summary
+        assert "total_duration_seconds" in summary
+
+    def test_run_integrated_workflow_returns_output_path(
+        self, mock_integrated_workflow, temp_dir, sample_documents
+    ):
+        """run_integrated_workflow should return the output directory path."""
+        mock_integrated_workflow.config.output_base_dir = str(temp_dir)
+
+        with patch("builtins.print"):
+            result = mock_integrated_workflow.run_integrated_workflow(
+                "BOP Installation", sample_documents
+            )
+
+        assert isinstance(result, Path)
+        assert result.exists()
+
+    def test_run_integrated_workflow_with_anthropic_backend(
+        self, temp_dir, sample_documents, mock_integrated_result
+    ):
+        """run_integrated_workflow should work with Anthropic backend."""
+        config = WorkflowConfig(
+            mode="integrated",
+            backend="anthropic",
+            output_base_dir=str(temp_dir)
+        )
+
+        with patch("src.workflow.orchestrator.ComparisonAgent"), \
+             patch("src.workflow.orchestrator.GapDetectorAgent"), \
+             patch("src.workflow.orchestrator.HPEvaluatorAgent"), \
+             patch("src.workflow.orchestrator.EquipmentValidatorAgent"), \
+             patch("src.workflow.orchestrator.StandardisationWriterAgent"), \
+             patch("src.workflow.orchestrator.IntegratedComplianceAgent") as mock_integrated:
+
+            mock_integrated.return_value.run.return_value = mock_integrated_result
+            workflow = ADNOCWorkflow(config)
+
+            with patch("builtins.print"):
+                workflow.run_integrated_workflow("Test", sample_documents)
+
+            call_kwargs = mock_integrated.return_value.run.call_args[1]
+            assert call_kwargs["backend"] == "anthropic"
+
+
+class TestADNOCWorkflowRunMethod:
+    """Tests for ADNOCWorkflow.run convenience method."""
+
+    @pytest.fixture
+    def mock_result(self):
+        """Create a mock agent result."""
+        return AgentResult(
+            content="# Test Output",
+            meta={
+                "agent": "Test",
+                "backend": "openai",
+                "total_duration_seconds": 1.0,
+                "tokens_total": 100,
+            }
+        )
+
+    def test_run_dispatches_to_sequential_by_default(
+        self, temp_dir, sample_documents, mock_result
+    ):
+        """run() should dispatch to sequential workflow by default."""
+        config = WorkflowConfig(output_base_dir=str(temp_dir))
+
+        with patch("src.workflow.orchestrator.ComparisonAgent") as mock_agent1, \
+             patch("src.workflow.orchestrator.GapDetectorAgent") as mock_agent2, \
+             patch("src.workflow.orchestrator.HPEvaluatorAgent") as mock_agent3, \
+             patch("src.workflow.orchestrator.EquipmentValidatorAgent") as mock_agent4, \
+             patch("src.workflow.orchestrator.StandardisationWriterAgent") as mock_agent5, \
+             patch("src.workflow.orchestrator.IntegratedComplianceAgent") as mock_integrated:
+
+            for mock_agent in [mock_agent1, mock_agent2, mock_agent3, mock_agent4, mock_agent5]:
+                mock_agent.return_value.run.return_value = mock_result
+
+            workflow = ADNOCWorkflow(config)
+
+            with patch("builtins.print"):
+                output_dir = workflow.run("Test", sample_documents)
+
+            # Should have called sequential agents
+            mock_agent1.return_value.run.assert_called_once()
+            mock_agent5.return_value.run.assert_called_once()
+            # Should NOT have called integrated agent
+            mock_integrated.return_value.run.assert_not_called()
+
+    def test_run_dispatches_to_integrated_when_configured(
+        self, temp_dir, sample_documents, mock_result
+    ):
+        """run() should dispatch to integrated workflow when mode is integrated."""
+        config = WorkflowConfig(mode="integrated", output_base_dir=str(temp_dir))
+
+        with patch("src.workflow.orchestrator.ComparisonAgent") as mock_agent1, \
+             patch("src.workflow.orchestrator.GapDetectorAgent"), \
+             patch("src.workflow.orchestrator.HPEvaluatorAgent"), \
+             patch("src.workflow.orchestrator.EquipmentValidatorAgent"), \
+             patch("src.workflow.orchestrator.StandardisationWriterAgent"), \
+             patch("src.workflow.orchestrator.IntegratedComplianceAgent") as mock_integrated:
+
+            mock_integrated.return_value.run.return_value = mock_result
+
+            workflow = ADNOCWorkflow(config)
+
+            with patch("builtins.print"):
+                output_dir = workflow.run("Test", sample_documents)
+
+            # Should have called integrated agent
+            mock_integrated.return_value.run.assert_called_once()
+            # Should NOT have called sequential agents
+            mock_agent1.return_value.run.assert_not_called()
+
+    def test_run_returns_output_path(self, temp_dir, sample_documents, mock_result):
+        """run() should return the output directory path."""
+        config = WorkflowConfig(output_base_dir=str(temp_dir))
+
+        with patch("src.workflow.orchestrator.ComparisonAgent") as mock_agent1, \
+             patch("src.workflow.orchestrator.GapDetectorAgent") as mock_agent2, \
+             patch("src.workflow.orchestrator.HPEvaluatorAgent") as mock_agent3, \
+             patch("src.workflow.orchestrator.EquipmentValidatorAgent") as mock_agent4, \
+             patch("src.workflow.orchestrator.StandardisationWriterAgent") as mock_agent5, \
+             patch("src.workflow.orchestrator.IntegratedComplianceAgent"):
+
+            for mock_agent in [mock_agent1, mock_agent2, mock_agent3, mock_agent4, mock_agent5]:
+                mock_agent.return_value.run.return_value = mock_result
+
+            workflow = ADNOCWorkflow(config)
+
+            with patch("builtins.print"):
+                result = workflow.run("Test", sample_documents)
+
+            assert isinstance(result, Path)
+            assert result.exists()
