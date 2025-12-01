@@ -134,7 +134,12 @@ class ADNOCWorkflow:
         # Agent 1: Comparison Analyst
         # ============================================================
         print("Running Agent 1: Comparison Analyst...")
-        r1 = self.agent1.run(documents, previous, backend=self.config.backend)
+        r1 = self.agent1.run(
+            documents,
+            previous,
+            backend=self.config.backend,
+            operation_name=operation_name,
+        )
         save_result("agent1_comparison", r1)
         previous["agent1"] = r1.content
 
@@ -142,7 +147,12 @@ class ADNOCWorkflow:
         # Agent 2: Gap Detector
         # ============================================================
         print("Running Agent 2: Gap Detector...")
-        r2 = self.agent2.run(documents, previous, backend=self.config.backend)
+        r2 = self.agent2.run(
+            documents,
+            previous,
+            backend=self.config.backend,
+            operation_name=operation_name,
+        )
         save_result("agent2_gaps", r2)
         previous["agent2"] = r2.content
 
@@ -150,7 +160,12 @@ class ADNOCWorkflow:
         # Agent 3: HP Evaluator
         # ============================================================
         print("Running Agent 3: Human Performance Evaluator...")
-        r3 = self.agent3.run(documents, previous, backend=self.config.backend)
+        r3 = self.agent3.run(
+            documents,
+            previous,
+            backend=self.config.backend,
+            operation_name=operation_name,
+        )
         save_result("agent3_hp_evaluation", r3)
         previous["agent3"] = r3.content
 
@@ -158,7 +173,12 @@ class ADNOCWorkflow:
         # Agent 4: Equipment Validator
         # ============================================================
         print("Running Agent 4: Equipment Validator...")
-        r4 = self.agent4.run(documents, previous, backend=self.config.backend)
+        r4 = self.agent4.run(
+            documents,
+            previous,
+            backend=self.config.backend,
+            operation_name=operation_name,
+        )
         save_result("agent4_equipment_validation", r4)
         previous["agent4"] = r4.content
 
@@ -166,7 +186,12 @@ class ADNOCWorkflow:
         # Agent 5: Standardisation Writer
         # ============================================================
         print("Running Agent 5: Standardisation Writer...")
-        r5 = self.agent5.run(documents, previous, backend=self.config.backend)
+        r5 = self.agent5.run(
+            documents,
+            previous,
+            backend=self.config.backend,
+            operation_name=operation_name,
+        )
         save_result("agent5_standardisation", r5)
         previous["agent5"] = r5.content
 

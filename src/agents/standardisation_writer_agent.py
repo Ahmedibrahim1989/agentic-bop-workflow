@@ -1,7 +1,7 @@
 """Agent 5: Standardisation Writer."""
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from src.agents.base import LLMAgent, AgentResult
 
@@ -28,6 +28,7 @@ class StandardisationWriterAgent:
         else:
             system_prompt = self._get_default_prompt()
         
+        self.base_prompt = system_prompt
         self.agent = LLMAgent("Agent 5 – Standardisation Writer", system_prompt)
 
     def _get_default_prompt(self) -> str:
@@ -59,6 +60,7 @@ Output format (Markdown):
         documents: Dict[str, str],
         previous_outputs: Dict[str, Any],
         backend: str = "openai",
+        operation_name: Optional[str] = None,
     ) -> AgentResult:
         """Execute standardisation writing.
         
@@ -66,10 +68,25 @@ Output format (Markdown):
             documents: Original documents (for reference).
             previous_outputs: Outputs from all previous agents.
             backend: LLM backend to use.
+            operation_name: Name of the operation.
             
         Returns:
             AgentResult with standardized procedures.
         """
+        # Update system prompt with operation context
+        op_label = operation_name or "the current operation described in the documents"
+        
+        # Get a snippet from the first document for grounding
+        first_doc = next(iter(documents.values()), "") if documents else ""
+        source_snippet = first_doc[:1500]
+        
+        self.agent.system_prompt = (
+            f"{self.base_prompt}\n\n"
+            f"Operation context: {op_label}.\n"
+            "Source document snippet (for grounding):\n"
+            f"{source_snippet}"
+        )
+
         agent1_output = previous_outputs.get("agent1", "")
         agent2_output = previous_outputs.get("agent2", "")
         agent3_output = previous_outputs.get("agent3", "")

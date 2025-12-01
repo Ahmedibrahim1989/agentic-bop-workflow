@@ -1,7 +1,7 @@
 """Agent 1: Comparison Analyst."""
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from src.agents.base import LLMAgent, AgentResult
 
@@ -29,6 +29,7 @@ class ComparisonAgent:
             # Fallback prompt if file doesn't exist
             system_prompt = self._get_default_prompt()
         
+        self.base_prompt = system_prompt
         self.agent = LLMAgent("Agent 1 – Comparison Analyst", system_prompt)
 
     def _get_default_prompt(self) -> str:
@@ -60,6 +61,7 @@ Output format (Markdown):
         documents: Dict[str, str],
         previous_outputs: Dict[str, Any],
         backend: str = "openai",
+        operation_name: Optional[str] = None,
     ) -> AgentResult:
         """Execute the comparison analysis.
         
@@ -67,10 +69,25 @@ Output format (Markdown):
             documents: Dictionary mapping document names to their text content.
             previous_outputs: Outputs from previous agents (empty for Agent 1).
             backend: LLM backend to use.
+            operation_name: Name of the operation (e.g., "BOP Installation").
             
         Returns:
             AgentResult with comparison analysis.
         """
+        # Update system prompt with operation context
+        op_label = operation_name or "the current operation described in the documents"
+        
+        # Get a snippet from the first document for grounding
+        first_doc = next(iter(documents.values()), "") if documents else ""
+        source_snippet = first_doc[:1500]
+        
+        self.agent.system_prompt = (
+            f"{self.base_prompt}\n\n"
+            f"Operation context: {op_label}.\n"
+            "Source document snippet (for grounding):\n"
+            f"{source_snippet}"
+        )
+
         # Build a comprehensive prompt with all documents
         docs_summary = "\n\n".join(
             f"### {name}\n\n{text[:8000]}..." if len(text) > 8000 else f"### {name}\n\n{text}"

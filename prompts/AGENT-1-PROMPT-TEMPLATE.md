@@ -181,7 +181,7 @@ Structure your output in Markdown with clear headings:
 Remember you are working within ADNOC's offshore drilling operations. Consider:
 
 - **ADNOC safety culture**: High standards, conservative approach
-- **Regulatory compliance**: ADNOC Corporate Practices (CPs), IADC guidelines
+- **Regulatory compliance**: ADNOC Company Practices (CPs), IADC guidelines
 - **Operational excellence**: Focus on efficiency without compromising safety
 - **Human performance**: Clear, unambiguous procedures
 
